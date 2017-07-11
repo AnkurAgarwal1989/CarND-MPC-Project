@@ -41,6 +41,14 @@ double polyeval(Eigen::VectorXd coeffs, double x) {
   return result;
 }
 
+double tangentialAngle(Eigen::VectorXd coeffs, double x) {
+	double angle = 0.0;
+	for (int i = 1; i < coeffs.size(); i++) {
+		angle += coeffs[i] * i * pow(x, i - 1);
+	}
+	return angle;
+}
+
 // Fit a polynomial.
 // Adapted from
 // https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl#L676-L716
