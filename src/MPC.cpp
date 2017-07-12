@@ -11,10 +11,10 @@ double tangentialAngle(Eigen::VectorXd coeffs, double x);
 
 // TODO: Set the timestep length and duration
 size_t N = 25;
-double dt = 0.15;
+double dt = 0.5;
 
 //reference velocity
-double ref_v = 30;
+double ref_v = 60;
 
 size_t state_size = 6; //x,y,psi,v, cte,e_psi
 size_t actuator_size = 2;
@@ -62,8 +62,8 @@ class FG_eval
 		for (int n = 0; n < N; ++n)
 		{
 			//Cost from state error (cte, epsi)
-			fg[0] += CppAD::pow(vars[cte_start + n], 2);
-			fg[0] += CppAD::pow(vars[epsi_start + n], 2);
+			fg[0] += 100*CppAD::pow(vars[cte_start + n], 2);
+			fg[0] += 100*CppAD::pow(vars[epsi_start + n], 2);
 			fg[0] += CppAD::pow(vars[v_start + n] - ref_v, 2); //Reference velocity...
 		}
 
@@ -79,8 +79,8 @@ class FG_eval
 		for (int n = 0; n < N - 2; ++n)
 		{
 			//Cost from state error (cte, epsi)
-			fg[0] += CppAD::pow(vars[delta_start + n] - vars[delta_start + n + 1], 2);
-			fg[0] += CppAD::pow(vars[a_start + n] - vars[a_start + n + 1], 2);
+			fg[0] += 300*CppAD::pow(vars[delta_start + n] - vars[delta_start + n + 1], 2);
+			fg[0] += 10*CppAD::pow(vars[a_start + n] - vars[a_start + n + 1], 2);
 		}
 		//
 		// Setup Constraints
@@ -143,7 +143,7 @@ class FG_eval
 			fg[1 + psi_start + t] = psi1 - (psi0 - v0 * delta0 / Lf * dt);
 			fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
 			fg[1 + cte_start + t] = cte1 - ((f0 - y0) + v0 * CppAD::sin(epsi0) * dt);
-			fg[1 + epsi_start + t] = epsi1 - (psi0 - psides0 + v0 * (delta0 / Lf) * dt);
+			fg[1 + epsi_start + t] = epsi1 - (psi0 - psides0 - v0 * (delta0 / Lf) * dt);
 		}
 	}
 };
