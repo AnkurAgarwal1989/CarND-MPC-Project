@@ -11,7 +11,7 @@ double tangentialAngle(Eigen::VectorXd coeffs, double x);
 
 // TODO: Set the timestep length and duration
 size_t N = 25;
-double dt = 0.05;
+double dt = 0.25;
 
 //reference velocity
 double ref_v = 60;
@@ -48,102 +48,98 @@ public:
 	FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
 
 	typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
+	// `fg` a vector of the cost constraints, `vars` is a vector of variable values (state & actuators)
+	// NOTE: You'll probably go back and forth between this function and
+	// the Solver function below.
 	void operator()(ADvector& fg, const ADvector& vars) {
-		// TODO: implement MPC
-		// `fg` a vector of the cost constraints, `vars` is a vector of variable values (state & actuators)
-		// NOTE: You'll probably go back and forth between this function and
-		// the Solver function below.
-		void operator()(ADvector& fg, const ADvector& vars) {
-			// The cost is stored is the first element of `fg`.
-			// Any additions to the cost should be added to `fg[0]`.
-			fg[0] = 0;
-			//Add costs over all time steps:
-			//There are N states
-			for (int n = 0; n < N; ++n) {
-				//Cost from state error (cte, epsi)
-				fg[0] += CppAD::pow(vars[cte_start + n], 2);
-				fg[0] += CppAD::pow(vars[epsi_start + n], 2);
-				fg[0] += CppAD::pow(vars[v_start + n] - ref_v, 2); //Reference velocity...
-			}
-
-			//There are N-1 actuations
-			//Minimize use of actuations
-			for (int n = 0; n < N - 1; ++n) {
-				fg[0] += CppAD::pow(vars[delta_start + n], 2);
-				fg[0] += CppAD::pow(vars[a_start + n], 2);
-			}
-
-			//Smooth the actuations
-			for (int n = 0; n < N - 2; ++n) {
-				//Cost from state error (cte, epsi)
-				fg[0] += CppAD::pow(vars[delta_start + n] - vars[delta_start + n + 1], 2);
-				fg[0] += CppAD::pow(vars[a_start + n] - vars[a_start + n + 1], 2);
-			}
-			//
-			// Setup Constraints
-			//
-
-			// Initial constraints
-			//
-			// We add 1 to each of the starting indices due to cost being located at
-			// index 0 of `fg`.
-			// This bumps up the position of all the other values.
-			//Current state (t=0) is constrained to be same. we can not change current state of vehicle
-			fg[1 + x_start] = vars[x_start];
-			fg[1 + y_start] = vars[y_start];
-			fg[1 + psi_start] = vars[psi_start];
-			fg[1 + v_start] = vars[v_start];
-			fg[1 + cte_start] = vars[cte_start];
-			fg[1 + epsi_start] = vars[epsi_start];
-
-			// The rest of the constraints
-			//Start evaluating from t=1 onwards. We look at t=1 and calc error with t=0 and so on.
-			for (int t = 1; t < N; t++) {
-
-				//State at t+1
-				AD<double> x1 = vars[x_start + t];
-				AD<double> y1 = vars[y_start + t];
-				AD<double> psi1 = vars[psi_start + t];
-				AD<double> v1 = vars[v_start + t];
-				AD<double> cte1 = vars[cte_start + t];
-				AD<double> epsi1 = vars[epsi_start + t];
-
-				//State at t
-				AD<double> x0 = vars[x_start + t - 1];
-				AD<double> y0 = vars[y_start + t - 1];
-				AD<double> psi0 = vars[psi_start + t - 1];
-				AD<double> v0 = vars[v_start + t - 1];
-				AD<double> cte0 = vars[cte_start + t - 1];
-				AD<double> epsi0 = vars[epsi_start + t - 1];
-
-				//For motion we can only consider actuation from previous time. 
-				AD<double> delta0 = vars[delta_start + t - 1];
-				AD<double> a0 = vars[a_start + t - 1];
-
-				AD<double> f0 = coeffs[0] + coeffs[1] * x0; // Y value...will be used for CTE later
-				AD<double> psides0 = CppAD::atan(coeffs[1]); // Psi error
-															 
-				// The idea here is to constraint these values to be 0.
-				// We want state_1 and state_0(after actuation) to be same.
-
-				//  Setup the rest of the model constraints
-				// the equations for the model:
-				// x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
-				// y_[t+1] = y[t] + v[t] * sin(psi[t]) * dt
-				// psi_[t+1] = psi[t] + v[t] / Lf * delta[t] * dt
-				// v_[t+1] = v[t] + a[t] * dt
-				// cte[t+1] = f(x[t]) - y[t] + v[t] * sin(epsi[t]) * dt
-				// epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
-				fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
-				fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
-				fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf  * dt);
-				fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
-				fg[1 + cte_start + t] = cte1 - ((f0 - y0) + v0 * CppAD::sin(epsi0) * dt));
-				fg[1 + epsi_start + t] = epsi - ((psi0 - psides0 + v0 * delta0 / Lf * dt);
-
-			}
+		// The cost is stored is the first element of `fg`.
+		// Any additions to the cost should be added to `fg[0]`.
+		fg[0] = 0;
+		//Add costs over all time steps:
+		//There are N states
+		for (int n = 0; n < N; ++n) {
+			//Cost from state error (cte, epsi)
+			fg[0] += CppAD::pow(vars[cte_start + n], 2);
+			fg[0] += CppAD::pow(vars[epsi_start + n], 2);
+			fg[0] += CppAD::pow(vars[v_start + n] - ref_v, 2); //Reference velocity...
 		}
 
+		//There are N-1 actuations
+		//Minimize use of actuations
+		for (int n = 0; n < N - 1; ++n) {
+			fg[0] += CppAD::pow(vars[delta_start + n], 2);
+			fg[0] += CppAD::pow(vars[a_start + n], 2);
+		}
+
+		//Smooth the actuations
+		for (int n = 0; n < N - 2; ++n) {
+			//Cost from state error (cte, epsi)
+			fg[0] += CppAD::pow(vars[delta_start + n] - vars[delta_start + n + 1], 2);
+			fg[0] += CppAD::pow(vars[a_start + n] - vars[a_start + n + 1], 2);
+		}
+		//
+		// Setup Constraints
+		//
+
+		// Initial constraints
+		//
+		// We add 1 to each of the starting indices due to cost being located at
+		// index 0 of `fg`.
+		// This bumps up the position of all the other values.
+		//Current state (t=0) is constrained to be same. we can not change current state of vehicle
+		fg[1 + x_start] = vars[x_start];
+		fg[1 + y_start] = vars[y_start];
+		fg[1 + psi_start] = vars[psi_start];
+		fg[1 + v_start] = vars[v_start];
+		fg[1 + cte_start] = vars[cte_start];
+		fg[1 + epsi_start] = vars[epsi_start];
+
+		// The rest of the constraints
+		//Start evaluating from t=1 onwards. We look at t=1 and calc error with t=0 and so on.
+		for (int t = 1; t < N; t++) {
+
+			//State at t+1
+			AD<double> x1 = vars[x_start + t];
+			AD<double> y1 = vars[y_start + t];
+			AD<double> psi1 = vars[psi_start + t];
+			AD<double> v1 = vars[v_start + t];
+			AD<double> cte1 = vars[cte_start + t];
+			AD<double> epsi1 = vars[epsi_start + t];
+
+			//State at t
+			AD<double> x0 = vars[x_start + t - 1];
+			AD<double> y0 = vars[y_start + t - 1];
+			AD<double> psi0 = vars[psi_start + t - 1];
+			AD<double> v0 = vars[v_start + t - 1];
+			AD<double> cte0 = vars[cte_start + t - 1];
+			AD<double> epsi0 = vars[epsi_start + t - 1];
+
+			//For motion we can only consider actuation from previous time. 
+			AD<double> delta0 = vars[delta_start + t - 1];
+			AD<double> a0 = vars[a_start + t - 1];
+
+			AD<double> f0 = coeffs[0] + coeffs[1] * x0; // Y value...will be used for CTE later
+			AD<double> psides0 = CppAD::atan(coeffs[1]); // Psi error
+														 
+			// The idea here is to constraint these values to be 0.
+			// We want state_1 and state_0(after actuation) to be same.
+
+			//  Setup the rest of the model constraints
+			// the equations for the model:
+			// x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
+			// y_[t+1] = y[t] + v[t] * sin(psi[t]) * dt
+			// psi_[t+1] = psi[t] + v[t] / Lf * delta[t] * dt
+			// v_[t+1] = v[t] + a[t] * dt
+			// cte[t+1] = f(x[t]) - y[t] + v[t] * sin(epsi[t]) * dt
+			// epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
+			fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
+			fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
+			fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf  * dt);
+			fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
+			fg[1 + cte_start + t] = cte1 - ((f0 - y0) + v0 * CppAD::sin(epsi0) * dt);
+			fg[1 + epsi_start + t] = epsi1 - (psi0 - psides0 + v0 * (delta0 / Lf) * dt);
+
+		}
 	}
 
 };
@@ -230,5 +226,5 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 	//
 	// {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
 	// creates a 2 element double vector.
-	return{};
+	return{solution.x[delta_start], solution.x[a_start]};
 }
