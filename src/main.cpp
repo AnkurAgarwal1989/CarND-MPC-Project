@@ -157,9 +157,9 @@ int main()
           cte = polyeval(coeffs, 0) - 0;
           // TODO: calculate the orientation error
           // derivative of coeffs[0] + coeffs[1] * x -> coeffs[1]
-          epsi = psi - atan(coeffs[1] + 2 * coeffs[2] * px + 3 * coeffs[3] * pow(px, 2));
+          epsi = psi - atan(coeffs[1] + 2*coeffs[2]*px + 3*coeffs[3]*pow(px, 2));
 
-          state << -1, 0, 0, 10, cte, epsi; //px, py, psi
+          state << 0,0,0, v, cte, epsi; //px, py, psi
           /*
           * TODO: Calculate steering angle and throttle using MPC.
           *
@@ -171,20 +171,25 @@ int main()
           for (int i=0; i< solution.size(); ++i){
             std::cout << solution[i] <<std::endl;
           }
-          double steer_value = solution[0];
-          double throttle_value = solution[1];
+          double steer_value = solution[12];
+          double throttle_value = solution[13];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = -steer_value;
+          msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
-          mpc_x_vals.push_back(solution[0]);
-          mpc_y_vals.push_back(solution[1]);
+          for (int i=0; i<6; ++i){
+          mpc_x_vals.push_back(solution[i]);
+          }
+          for (int i=6; i<12; ++i){
+          mpc_y_vals.push_back(solution[i]);
+          }
+          
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
 
