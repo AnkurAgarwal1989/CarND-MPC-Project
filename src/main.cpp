@@ -17,6 +17,12 @@ constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
 
+//Transform points from map to car coordinates
+double transform(double car_x, double car_y, double psi, double map_x, double map_y, vector<double>& output) {
+	output[0] = map_x*cos(psi) + map_y*sin(psi) - car_x;
+	output[1] = map_x*sin(psi) + map_y*cos(psi) - car_y;
+}
+
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
@@ -86,6 +92,10 @@ int main() {
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
     cout << sdata << endl;
+
+	//vector to hold state
+	Eigen::VectorXd state(6);
+
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       string s = hasData(sdata);
       if (s != "") {
@@ -95,17 +105,50 @@ int main() {
           // j[1] is the data JSON object
           vector<double> ptsx = j[1]["ptsx"];
           vector<double> ptsy = j[1]["ptsy"];
-          double px = j[1]["x"];
+          // State
+		  double px = j[1]["x"];
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+		  // Errors
+		  double cte;
+		  double epsi;
 
+		  //Transform to vehicle coordinates
+		  size_t num_waypoints = ptsx.size();
+		  for (size_t i = 0; i < num_waypoints; ++i) {
+			  double dist_x = ptsx[i] - px; // distance from car in car's x axis
+			  double dist_y = ptsy[i] - py; // distance from car in car's y axis
+
+			  //convert to car coordinates
+			  ptsx[i] = (dist_x * cos(-psi) - dist_y *sin(-psi));
+			  ptsy[i] = (dist_x * sin(-psi) + dist_y *cos(-psi));
+		  }
+
+		  //Map to eigen
+		  double* ptrx = &ptsx[0];
+		  Eigen::Map<Eigen::VectorXd> ptsx_trans(ptrx, num_waypoints); // note the six elements
+
+		  double* ptry = &ptsy[0];
+		  Eigen::Map<Eigen::VectorXd> ptsy_trans(ptry, num_waypoints);
+		  
+		  Eigen::VectorXd coeffs = polyfit(ptsx_trans, ptsy_trans, 3);
+
+		  //calculate the cross track error
+		  //Since all calc are in vehicle frame, current x and y are 0
+		  cte = polyeval(coeffs, 0) - 0;
+		  // TODO: calculate the orientation error
+		  // derivative of coeffs[0] + coeffs[1] * x -> coeffs[1]
+		  epsi = psi - atan(coeffs[1] + 2*coeffs[2]*px + 3*coeffs[3]*pow(px, 2));
+
+		  state << px, py, psi, v, cte, epsi;
           /*
           * TODO: Calculate steering angle and throttle using MPC.
           *
           * Both are in between [-1, 1].
           *
           */
+		  vector<double> solution = mpc.Solve(state, coeffs);
           double steer_value;
           double throttle_value;
 
