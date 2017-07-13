@@ -99,6 +99,8 @@ int main()
   // MPC is initialized here!
   MPC mpc;
 
+  int order = 1;
+
   h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -151,13 +153,16 @@ int main()
           Eigen::Map<Eigen::VectorXd> ptsy_trans(ptry, num_waypoints);
 
           Eigen::VectorXd coeffs = polyfit(ptsx_trans, ptsy_trans, 3);
-
+          std::cout << "Coeffs" <<std::endl;
+          for (int i=0; i< coeffs.size(); ++i){
+            std::cout << coeffs[i] <<std::endl;
+          }
           //calculate the cross track error
           //Since all calc are in vehicle frame, current x and y are 0
           cte = polyeval(coeffs, 0) - 0;
           // TODO: calculate the orientation error
           // derivative of coeffs[0] + coeffs[1] * x -> coeffs[1]
-          epsi = psi - atan(coeffs[1] + 2*coeffs[2]*px + 3*coeffs[3]*pow(px, 2));
+          epsi = psi - atan(coeffs[1]);// + 2*coeffs[2]*px + 3*coeffs[3]*pow(px, 2));
 
           state << 0,0,0, v, cte, epsi; //px, py, psi
           /*
@@ -177,7 +182,7 @@ int main()
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value;
+          msgJson["steering_angle"] = steer_value;///2.67;
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory
@@ -199,12 +204,19 @@ int main()
           //Display the waypoints/reference line
           vector<double> next_x_vals;
           vector<double> next_y_vals;
+          double next_x= 0;
+          double dx = 4.0;
+          for (int i=0; i<10; ++i){
+          next_x_vals.push_back(next_x);
+          next_y_vals.push_back(polyeval(coeffs, next_x));
+          next_x += dx;
+          }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
 
-          msgJson["next_x"] = ptsx;
-          msgJson["next_y"] = ptsy;
+          msgJson["next_x"] = next_x_vals;
+          msgJson["next_y"] = next_y_vals;
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;

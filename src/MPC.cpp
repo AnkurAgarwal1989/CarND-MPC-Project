@@ -10,8 +10,9 @@ double polyeval(Eigen::VectorXd coeffs, double x);
 double tangentialAngle(Eigen::VectorXd coeffs, double x);
 
 // TODO: Set the timestep length and duration
-size_t N = 10;
+size_t N = 15;
 double dt = 0.15;
+int order = 1;
 
 //reference velocity
 double ref_v = 60;
@@ -63,23 +64,23 @@ class FG_eval
 		{
 			//Cost from state error (cte, epsi)
 			fg[0] += 500*CppAD::pow(vars[cte_start + n], 2);
-			fg[0] += 1000*CppAD::pow(vars[epsi_start + n], 2);
-			fg[0] += 100*CppAD::pow(vars[v_start + n] - ref_v, 2); //Reference velocity...
+			fg[0] += 500*CppAD::pow(vars[epsi_start + n], 2);
+			fg[0] += CppAD::pow(vars[v_start + n] - ref_v, 2); //Reference velocity...
 		}
 
 		//There are N-1 actuations
 		//Minimize use of actuations
 		for (int n = 0; n < N - 1; ++n)
 		{
-			fg[0] += 500*CppAD::pow(vars[delta_start + n], 2);
-			fg[0] += 500*CppAD::pow(vars[a_start + n], 2);
+			fg[0] += CppAD::pow(vars[delta_start + n], 2);
+			fg[0] += CppAD::pow(vars[a_start + n], 2);
 		}
 
 		//Smooth the actuations
 		for (int n = 0; n < N - 2; ++n)
 		{
 			//Cost from state error (cte, epsi)
-			fg[0] += 200*CppAD::pow(vars[delta_start + n] - vars[delta_start + n + 1], 2);
+			fg[0] += 2000*CppAD::pow(vars[delta_start + n] - vars[delta_start + n + 1], 2);
 			fg[0] += 100*CppAD::pow(vars[a_start + n] - vars[a_start + n + 1], 2);
 		}
 		//
