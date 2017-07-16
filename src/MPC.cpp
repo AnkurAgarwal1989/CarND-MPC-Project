@@ -10,12 +10,12 @@ double polyeval(Eigen::VectorXd coeffs, double x);
 double tangentialAngle(Eigen::VectorXd coeffs, double x);
 
 // TODO: Set the timestep length and duration
-size_t N = 10;
-double dt = 0.125;
+size_t N = 15;
+double dt = 0.15;
 int order = 1;
 
 //reference velocity
-double ref_v = 100;
+double ref_v = 60;
 
 size_t state_size = 6; //x,y,psi,v, cte,e_psi
 size_t actuator_size = 2;
@@ -63,32 +63,32 @@ class FG_eval
 		for (int n = 0; n < N; ++n)
 		{
 			//Cost from state error (cte, epsi)
-			fg[0] += 5000*CppAD::pow(vars[cte_start + n], 2);
-			fg[0] += 500*CppAD::pow(vars[epsi_start + n], 2);
-			fg[0] += 3*CppAD::pow(vars[v_start + n] - ref_v, 2); //Reference velocity...
+			fg[0] += 1500*CppAD::pow(vars[cte_start + n], 2);
+			fg[0] += 1500*CppAD::pow(vars[epsi_start + n], 2);
+			fg[0] += CppAD::pow(vars[v_start + n] - ref_v, 2); //Reference velocity...
 		}
 
 		//There are N-1 actuations
 		//Minimize use of actuations
 		for (int n = 0; n < N - 1; ++n)
 		{
-			fg[0] += 100*CppAD::pow(vars[delta_start + n], 2);
-			fg[0] += 50*CppAD::pow(vars[a_start + n], 2);
+			fg[0] += 500*CppAD::pow(vars[delta_start + n], 2);
+			fg[0] += 100*CppAD::pow(vars[a_start + n], 2);
 		}
 
 		//Smooth the actuations
 		for (int n = 0; n < N - 2; ++n)
 		{
 			//Cost from state error (cte, epsi)
-			fg[0] += 2000*CppAD::pow(vars[delta_start + n] - vars[delta_start + n + 1], 2);
-			fg[0] += 100*CppAD::pow(vars[a_start + n] - vars[a_start + n + 1], 2);
+			fg[0] += CppAD::pow(vars[delta_start + n] - vars[delta_start + n + 1], 2);
+			fg[0] += CppAD::pow(vars[a_start + n] - vars[a_start + n + 1], 2);
 		}
 
 		//Smooth the trajectory
 		for (int n = 0; n < N - 2; ++n)
 		{
 			//Cost from state error (cte, epsi)
-			fg[0] += 10*CppAD::pow(vars[y_start + n] - vars[y_start + n + 1], 2);
+			fg[0] += CppAD::pow(vars[y_start + n] - vars[y_start + n + 1], 2);
 		}
 		//
 		// Setup Constraints
@@ -133,7 +133,7 @@ class FG_eval
 			AD<double> a0 = vars[a_start + t - 1];
 
 			AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * CppAD::pow(x0, 2) + coeffs[3] * CppAD::pow(x0, 3); // Y value...will be used for CTE later
-			AD<double> psides0 = CppAD::atan(coeffs[1] + 2 * coeffs[2] * x0 + 3 * coeffs[3] * CppAD::pow(x0, 2));		// Psi error
+			AD<double> psides0 = CppAD::atan(coeffs[1] + (2 * coeffs[2] * x0) + (3 * coeffs[3] * CppAD::pow(x0, 2)));		// Psi error
 
 			// The idea here is to constraint these values to be 0.
 			// We want state_1 and state_0(after actuation) to be same.
@@ -148,10 +148,10 @@ class FG_eval
 			// epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
 			fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
 			fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
-			fg[1 + psi_start + t] = psi1 - (psi0 - v0 * delta0 / Lf * dt);
+			fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
 			fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
 			fg[1 + cte_start + t] = cte1 - ((f0 - y0) + v0 * CppAD::sin(epsi0) * dt);
-			fg[1 + epsi_start + t] = epsi1 - (psi0 - psides0 - v0 * (delta0 / Lf) * dt);
+			fg[1 + epsi_start + t] = epsi1 - (psi0 - psides0 + v0 * (delta0 / Lf) * dt);
 		}
 	}
 };

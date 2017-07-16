@@ -17,13 +17,6 @@ constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
 
-//Transform points from map to car coordinates
-double transform(double car_x, double car_y, double psi, double map_x, double map_y, vector<double> &output)
-{
-  output[0] = map_x * cos(psi) + map_y * sin(psi) - car_x;
-  output[1] = map_x * sin(psi) + map_y * cos(psi) - car_y;
-}
-
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
@@ -54,14 +47,15 @@ double polyeval(Eigen::VectorXd coeffs, double x)
   return result;
 }
 
-double tangentialAngle(Eigen::VectorXd coeffs, double x)
+//Differential of polyfit
+double polydiff(Eigen::VectorXd coeffs, double x)
 {
-  double angle = 0.0;
+  double diff = 0.0;
   for (int i = 1; i < coeffs.size(); i++)
   {
-    angle += coeffs[i] * i * pow(x, i - 1);
+    diff += coeffs[i] * i * pow(x, i - 1);
   }
-  return angle;
+  return diff;
 }
 
 // Fit a polynomial.
@@ -108,6 +102,7 @@ int main()
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
     cout << sdata << endl;
+    double Lf = 2.67;
 
     //vector to hold state
     Eigen::VectorXd state(6);
@@ -129,10 +124,22 @@ int main()
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          double delta = j[1]["steering_angle"];
+          double a = j[1]["throttle"];
           // Errors
           double cte;
           double epsi;
-
+          //std::cout << px << " " << py << " " << psi << " " << v << " " << delta <<std::endl;
+          //Propagating state forward by 100 ms to account for latency
+          double latency = 0.100;
+          px += v * cos(psi) * latency;
+          py += v * sin(psi) * latency;
+          psi += (v * (-delta/Lf) * latency);
+          v += a * latency;
+          //std::cout << "Here 1" <<std::endl;
+          //std::cout << px << " " << py << " " << psi << " " << v << " " << cte <<std::endl;
+          
+          
           //Transform to vehicle coordinates
           size_t num_waypoints = ptsx.size();
           for (size_t i = 0; i < num_waypoints; ++i)
@@ -153,18 +160,18 @@ int main()
           Eigen::Map<Eigen::VectorXd> ptsy_trans(ptry, num_waypoints);
 
           Eigen::VectorXd coeffs = polyfit(ptsx_trans, ptsy_trans, 3);
-          std::cout << "Coeffs" <<std::endl;
-          for (int i=0; i< coeffs.size(); ++i){
-            std::cout << coeffs[i] <<std::endl;
-          }
+          
+          //for (int i=0; i< coeffs.size(); ++i){
+          //  std::cout << coeffs[i] <<std::endl;
+          //}
           //calculate the cross track error
           //Since all calc are in vehicle frame, current x and y are 0
           cte = polyeval(coeffs, 0) - 0;
-          // TODO: calculate the orientation error
-          // derivative of coeffs[0] + coeffs[1] * x -> coeffs[1]
-          epsi = psi - atan(coeffs[1]);// + 2*coeffs[2]*px + 3*coeffs[3]*pow(px, 2));
+          epsi = 0 - atan(polydiff(coeffs, 0));
 
           state << 0,0,0, v, cte, epsi; //px, py, psi
+          
+          
           /*
           * TODO: Calculate steering angle and throttle using MPC.
           *
@@ -173,16 +180,16 @@ int main()
           */
           std::cout << "Solving " << std::endl;
           vector<double> solution = mpc.Solve(state, coeffs);
-          for (int i=0; i< solution.size(); ++i){
-            std::cout << solution[i] <<std::endl;
-          }
+          //for (int i=0; i< solution.size(); ++i){
+          //  std::cout << solution[i] <<std::endl;
+          // }
           double steer_value = solution[12];
           double throttle_value = solution[13];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value;///2.67;
+          msgJson["steering_angle"] = -steer_value/deg2rad(25);///2.67;
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory
