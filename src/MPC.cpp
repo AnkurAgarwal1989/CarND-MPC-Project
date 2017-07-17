@@ -10,12 +10,11 @@ double polyeval(Eigen::VectorXd coeffs, double x);
 double tangentialAngle(Eigen::VectorXd coeffs, double x);
 
 // TODO: Set the timestep length and duration
-size_t N = 15;
-double dt = 0.15;
-int order = 1;
+size_t N = 10; //10
+double dt = 0.15; //0.15
 
 //reference velocity
-double ref_v = 60;
+double ref_v = 100;
 
 size_t state_size = 6; //x,y,psi,v, cte,e_psi
 size_t actuator_size = 2;
@@ -58,37 +57,36 @@ class FG_eval
 		// The cost is stored is the first element of `fg`.
 		// Any additions to the cost should be added to `fg[0]`.
 		fg[0] = 0;
-		//Add costs over all time steps:
+		//Add costs over all time steps:d
 		//There are N states
 		for (int n = 0; n < N; ++n)
 		{
 			//Cost from state error (cte, epsi)
-			fg[0] += 1500*CppAD::pow(vars[cte_start + n], 2);
-			fg[0] += 1500*CppAD::pow(vars[epsi_start + n], 2);
-			fg[0] += CppAD::pow(vars[v_start + n] - ref_v, 2); //Reference velocity...
+			fg[0] += 5000*CppAD::pow(vars[cte_start + n], 2);
+			fg[0] += 3000*CppAD::pow(vars[epsi_start + n], 2);
+			fg[0] += 5*CppAD::pow(vars[v_start + n] - ref_v, 2); //Reference velocity...
 		}
 
 		//There are N-1 actuations
 		//Minimize use of actuations
 		for (int n = 0; n < N - 1; ++n)
 		{
-			fg[0] += 500*CppAD::pow(vars[delta_start + n], 2);
-			fg[0] += 100*CppAD::pow(vars[a_start + n], 2);
+			fg[0] += 2000*CppAD::pow(vars[delta_start + n], 2);
+			fg[0] += 500*CppAD::pow(vars[a_start + n], 2);
 		}
 
 		//Smooth the actuations
 		for (int n = 0; n < N - 2; ++n)
 		{
-			//Cost from state error (cte, epsi)
-			fg[0] += CppAD::pow(vars[delta_start + n] - vars[delta_start + n + 1], 2);
-			fg[0] += CppAD::pow(vars[a_start + n] - vars[a_start + n + 1], 2);
+			fg[0] += 2000*CppAD::pow(vars[delta_start + n] - vars[delta_start + n + 1], 2);
+			fg[0] += 500*CppAD::pow(vars[a_start + n] - vars[a_start + n + 1], 2);
 		}
 
 		//Smooth the trajectory
 		for (int n = 0; n < N - 2; ++n)
 		{
 			//Cost from state error (cte, epsi)
-			fg[0] += CppAD::pow(vars[y_start + n] - vars[y_start + n + 1], 2);
+			fg[0] += 100*CppAD::pow(vars[y_start + n] - vars[y_start + n + 1], 2);
 		}
 		//
 		// Setup Constraints
@@ -151,7 +149,7 @@ class FG_eval
 			fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
 			fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
 			fg[1 + cte_start + t] = cte1 - ((f0 - y0) + v0 * CppAD::sin(epsi0) * dt);
-			fg[1 + epsi_start + t] = epsi1 - (psi0 - psides0 + v0 * (delta0 / Lf) * dt);
+			fg[1 + epsi_start + t] = epsi1 - (psi0 - psides0 - v0 * (delta0 / Lf) * dt);
 		}
 	}
 };

@@ -38,9 +38,15 @@ $$
 
 #### Timestep Length and Elapsed Duration (N & dt)
 
-- Current value of <u>N and dt is 10 and 0.125</u> respectively. This is an arbitrary value which works fine with the current cost weights.
+- Current value of <u>N and dt is 10 and 0.15</u> respectively. These values were chosen with some trial and error. We are essentially optimizing over N\*dt time. N larger than 15 makes the trajectory very long at higher speeds, which makes the optimizatio unstable. If dt is too long, we have coarser control. 
 - I also tried values of N=15, 20 and 25. 20 and 25 did not seem to work very well. Also fewer N means smaller optimization space, which works.
-- For dt, <u>a value > 0.1 is chosen to account for the 100 ms delay</u>. Most values above 0.1 and under 0.2 seem to work.
+- For dt, most values above 0.12 and under 0.18 seem to work.
+
+#### Latency
+- We need to account for 100 ms of latency. To do so, The initial state (global coordinates) was first propagated to future 100ms.
+- These values are then used to transform waypoints from Map reference to Car reference.
+- This is done in **Lines 134-138 in main.cpp**.
+
 
 #### Polynomial Fitting and MPC Preprocessing
 
